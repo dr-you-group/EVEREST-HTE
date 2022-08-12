@@ -36,11 +36,10 @@ df<-df[,!names(df) %in% c("W")]
 
 
 covariate_names<-c("AGE", "SEX2", "DIABETES", "DIABETES.INSULIN", 
-                   "DYSLIPIDEMIA", "HTN", "PRIOR.MI", "PRIOR.PCI",
+                   "DYSLIPIDEMIA", "HTN", "PRIOR.MI", "PRIOR.PCI", "PCI.LM.YN",
                    "PRIOR.STROKE", "ACUTE.CORONARY.SYNDROME",
-                   "IMPLANTED.STENT.NO", "MVD.YN","PCI.LM.YN",
-                   "TOTAL.STENT.LENGTH", "BASELINE.HEMOGLOBIN", 
-                   "WBC.COUNT", "PRESENT_MI")
+                   "IMPLANTED.STENT.NO", "MVD.YN", "TOTAL.STENT.LENGTH", 
+                   "BASELINE.HEMOGLOBIN", "WBC.COUNT", "PRESENT_MI")
 
 
 
@@ -65,7 +64,7 @@ df_test <- df_Missi[df_Missi$STUDY==3,]#TICO
 
 
 # predicte ARR through the X-learner
-source("C:/git/EVEREST-HTE/Final/X-learner.R")
+source("C:/git/EVEREST-HTE/HTE/X-learner.R")
 
 set.seed(1111)
 train_x_learner_fit <- train_x_learner(df_train[,covariate_names], df_train$W2, 
@@ -81,12 +80,15 @@ test$class<-ifelse(test$predict_x_learner_fit<=0, "benefit", "no-benefit")
 
 
 # Interpretation of X-learner with Random Forests
-source("C:/git/EVEREST-HTE/Final/Interpretation.R")
+source("C:/git/EVEREST-HTE/HTE/Interpretation.R")
 
 xf0 = readRDS(file.path(dataFolder, "xf0.rds"))
 xf1 = readRDS(file.path(dataFolder, "xf1.rds"))
 
+
+
 #Relative importance plot
+
 plot_importance(xf0, xf1, df_train, covariate_names, 16)
 
 
@@ -112,7 +114,7 @@ surv_func = function(test){
   test$Time<-ifelse(test$DAYS.TIMI.MAJOR.BLEEDING<360, test$DAYS.TIMI.MAJOR.BLEEDING, 360)
   test$class<-ifelse(test$predict_x_learner_fit<=0, "benefit", "no-benefit")
   test$class2<-ifelse(test$predict_x_learner_fit<=0, 1, 0)
-  Time<-ifelse(test$DAYS.TIMI.MAJOR.BLEEDING<360, test$DAYS.TIMI.MAJOR.BLEEDING, 360)
+  #Time<-ifelse(test$DAYS.TIMI.MAJOR.BLEEDING<360, test$DAYS.TIMI.MAJOR.BLEEDING, 360)
   
   
   fit1<-survfit(Surv(Time, Y) ~ class, data = test)
@@ -200,14 +202,14 @@ for (i in 1:3) {
                                 censor=F,
                                 break.time.by=90, 
                                 break.y.by=0.01,
-                                pval.method=TRUE,
+                                pval.method=F,
                                 risk.table.col = "strata",
-                                ggtheme = theme_bw(), 
+                                ggtheme=theme_classic2(base_size=12, base_family="Arial"), 
                                 palette = palette[[i]],
                                 fun = "cumhaz",
                                 xlim = c(0, 360), ylim = c(0, y.max[i]),
                                 risk.table = TRUE,
-                                tables.theme = theme_cleantable(),
+                                #tables.theme = theme_cleantable(),
                                 title = title.nm[i],
                                 fontsize=3.0,     
                                 risk.table.pos="out",
@@ -288,7 +290,7 @@ print(tabUnmatched, smd = TRUE)
 
 
 # herral's c-index for x-learner model
-source("C:/git/EVEREST-HTE/Final/Calibration.R")
+source("C:/git/EVEREST-HTE/HTE/Calibration.R")
 c_indx(surv_d$test, "class")
 
 
@@ -390,7 +392,7 @@ plt_risk_x<-plt_risk_x+
 # Apply Model for other outcome(NACE, MACE)
 
 # NACE
-source("C:/git/EVEREST-HTE/Final/Apply.R")
+source("C:/git/EVEREST-HTE/HTE/Apply.R")
 
 result_ex<-aply("AD.MI.ST.CVA.MAJOR.BLEEDING")
 
@@ -446,7 +448,7 @@ for (i in 1:3) {
               "AD.MI.ST.CVA.MAJOR.BLEEDING for Benefit", 
               "AD.MI.ST.CVA.MAJOR.BLEEDING for No-benefit")
   
-  y.max<-c(0.08, 0.08, 0.1)
+  y.max<-c(0.1, 0.1, 0.1)
   
   legend.lab<-c()
   legend.lab[[1]]<-c("No-benefit", "Benefit(Short)")
@@ -463,13 +465,13 @@ for (i in 1:3) {
   #plotting
   survplot_NACE[[i]]<-ggsurvplot(survfit(form[[i]], data =dat[[i]]),
                                  conf.int = T,
-                                 pval = T,
+                                 pval = F,
                                  censor=F,
                                  break.time.by=90, 
                                  break.y.by=0.01,
-                                 pval.method=TRUE,
+                                 pval.method=F,
                                  risk.table.col = "strata",
-                                 ggtheme = theme_bw(), 
+                                 ggtheme=theme_classic2(base_size=12, base_family="Arial"), 
                                  palette = palette[[i]],
                                  fun = "cumhaz",
                                  ylab = "",
@@ -479,7 +481,7 @@ for (i in 1:3) {
                                  fontsize=3.0,     
                                  risk.table.pos="out",
                                  risk.table.y.text.col=FALSE,
-                                 tables.theme = theme_cleantable(),
+                                 #tables.theme = theme_cleantable(),
                                  legend.labs = legend.lab[[i]],
                                  legend.title=""
                                  
@@ -545,7 +547,7 @@ form[[3]]<-formula("Surv(Time, Y) ~ DAPT")
 dat[[3]]<-subset(result_ex$test_ex, class_ex=="no-benefit")
 
 #Log-Lank Test
-km_diff<-c()
+km_diff<-c();
 km_pval<-c()
 tmp<-c()
 cox_out<-c()
@@ -578,7 +580,7 @@ Result
 for (i in 1:3) {
   
   title.nm<-c("CD.MI.ST.CVA", "CD.MI.ST.CVA for Benefit", "CD.MI.ST.CVA for No-benefit")
-  y.max<-c(0.08, 0.08, 0.08)
+  y.max<-c(0.1, 0.1, 0.1)
   
   legend.lab<-c()
   legend.lab[[1]]<-c("No-benefit", "Benefit(Short)")
@@ -594,13 +596,13 @@ for (i in 1:3) {
   #plotting
   survplot_MACE[[i]]<-ggsurvplot(survfit(form[[i]], data =dat[[i]]),
                                  conf.int = T,
-                                 pval = T,
+                                 pval = F,
                                  censor=F,
                                  break.time.by=90, 
                                  break.y.by=0.01,
-                                 pval.method=TRUE,
+                                 pval.method=F,
                                  risk.table.col = "strata", 
-                                 ggtheme = theme_bw(), 
+                                 ggtheme=theme_classic2(base_size=12, base_family="Arial"),
                                  palette = palette[[i]],
                                  fun = "cumhaz",
                                  ylab="",
@@ -610,7 +612,7 @@ for (i in 1:3) {
                                  fontsize=3.0,     
                                  risk.table.pos="out",
                                  risk.table.y.text.col=FALSE,
-                                 tables.theme = theme_cleantable(),
+                                 #tables.theme = theme_cleantable(),
                                  legend.labs = legend.lab[[i]],
                                  legend.title=""
                                  
@@ -657,3 +659,83 @@ c_indx(result_ex$test_ex, "class_ex")
 
 
 
+
+# Ex_Surv Plot for Train set
+
+set.seed(1111)
+train_x_learner_fit<-train_x_learner(df_train[,covariate_names], df_train$W2, df_train$Y, ipcw=0.5)
+predict_x_learner_fit<-predict_x_learner(df_train[,covariate_names], as.numeric(df_train$W2), FALSE, TRUE)
+
+train<-cbind(df_train, predict_x_learner_fit)
+
+surv_d<-surv_func(train)
+
+
+surv_plt<-function(){
+  
+  survplot<-c()
+  
+  form_bled<-list()
+  dat_bled<-list()
+  
+  form_bled[[1]]<-formula("Surv(Time, Y) ~ class"); dat_bled[[1]]<-surv_d$test
+  form_bled[[2]]<-formula("Surv(Time, Y) ~ DAPT"); dat_bled[[2]]<-subset(surv_d$test, class=="benefit")
+  form_bled[[3]]<-formula("Surv(Time, Y) ~ DAPT"); dat_bled[[3]]<-subset(surv_d$test, class=="no-benefit")
+  
+  for (i in 1:3) {
+    
+    title.nm<-c("TIMI.MAJOR.BLEEDING", "TIMI.MAJOR.BLEEDING for Benefit", "TIMI.MAJOR.BLEEDING for No-benefit")
+    y.max<-c(0.05, 0.05, 0.05)
+    
+    legend.lab<-c()
+    legend.lab[[1]]<-c("Benefit(Short)", "No-benefit")
+    legend.lab[[2]]<-c("DAPT 12 month", "DAPT 6 month")
+    legend.lab[[3]]<-c("DAPT 12 month", "DAPT 6 month")
+    
+    
+    palette<-c()
+    palette[[1]]<-c("#7CAE00", "#FF6600")
+    palette[[2]]<-"circulation"
+    palette[[3]]<-"circulation"
+    
+    #plotting
+    survplot[[i]]<-ggsurvplot(survfit(form_bled[[i]], data =dat_bled[[i]]),
+                              conf.int = T,
+                              pval = T,
+                              censor=F,
+                              break.time.by=90, 
+                              break.y.by=0.01,
+                              pval.method=TRUE,
+                              risk.table.col = "strata", # Change risk table color by groups
+                              #ggtheme = theme_bw(), # Change ggplot2 theme
+                              palette = palette[[i]],
+                              fun = "cumhaz",
+                              xlim = c(0, 360), ylim = c(0, y.max[i]),
+                              risk.table = TRUE,
+                              title = title.nm[i],#Cardiac death, MI, stent thrombosis, CVA
+                              fontsize=4.0,     
+                              risk.table.pos="out",
+                              risk.table.y.text.col=FALSE,
+                              #tables.theme = theme_cleantable(),
+                              ggtheme=theme_classic2(base_size=12, base_family="Arial"),
+                              font.family="Arial",
+                              legend.labs = legend.lab[[i]],
+                              legend.title=""
+                              
+    ) 
+    ggpar(survplot[[i]],
+          font.main = c(13, "bold.italic", "darkblue"),
+          font.x = c(11, "bold", "black"),
+          font.y = c(11, "bold", "black"),
+          font.tickslab = c(11, "plain", "black"), 
+          font.legend = c(11, "bold") 
+    )
+  }
+  
+  return(survplot)
+  
+}
+
+train_plt<-surv_plt()
+
+train_plt$sur
